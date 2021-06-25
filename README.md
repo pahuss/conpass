@@ -1,0 +1,2 @@
+# conpass
+Console password manager
