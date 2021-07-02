@@ -1,21 +1,37 @@
 package main
 
 import (
-	"bufio"
+	"conpass/encoder"
 	"conpass/helpers"
-	"conpass/util"
+	"conpass/stores/file"
+	"errors"
 	"fmt"
 	"github.com/atotto/clipboard"
 	"github.com/thatisuday/commando"
+	"golang.org/x/term"
 	"os"
 	"os/user"
 	"path"
+	"syscall"
 )
 
 const (
 	WorkDir = ".conpass"
-	//Salt = "a2de4fs"
 )
+
+type Store interface {
+	Get(key string) ([]byte, error)
+	Add(key string, data []byte) error
+	Edit(key string, data []byte) error
+	Delete(key string) error
+}
+
+func newStore(args ...interface{}) Store {
+	return &file.Store{
+		WorkDir: args[0].(string),
+		Encoder: args[1].(encoder.Encoder),
+	}
+}
 
 func main() {
 	homeDir, err := os.UserHomeDir()
@@ -60,6 +76,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	store := newStore(dataDirPath, encoder.NewEncoder())
+
 	// configure commando
 	commando.
 		SetExecutableName("conpass").
@@ -70,9 +88,12 @@ func main() {
 	commando.
 		Register(nil).
 		AddFlag("name,n", "Data name", commando.String, "").
-		AddFlag("buffer,b", "Copy to clipboard", commando.Bool, true).
+		AddFlag("verbose,V", "Out data to screen", commando.Bool, false).
 		SetAction(func(args map[string]commando.ArgValue, flags map[string]commando.FlagValue) {
-			GetAction(flags["name"].Value.(string), dataDirPath, flags["buffer"].Value.(bool))
+			fmt.Print("Password: ")
+			bytePassword, _ := term.ReadPassword(int(syscall.Stdin))
+			fmt.Println(string(bytePassword))
+			GetAction(store, flags["name"].Value.(string), flags["verbose"].Value.(bool))
 		})
 
 	// configure info command
@@ -84,51 +105,41 @@ func main() {
 		AddFlag("data,d", "Data body", commando.String, "").
 		SetAction(func(args map[string]commando.ArgValue, flags map[string]commando.FlagValue) {
 			name, data := getFlags(flags)
-			AddAction(name, data, dataDirPath)
+			AddAction(store, name, data)
 		})
 
 	// parse command-line arguments
 	commando.Parse(nil)
 }
 
-func AddAction(name, data, workDir string) {
-	file, err := os.OpenFile(path.Join(workDir, helpers.GetMD5Hash(name+"")), os.O_WRONLY|os.O_CREATE, 0600)
-	if err != nil {
-		printError(err.Error())
+func AddAction(store Store, name, data string) {
+	if name == "" {
+		printError(errors.New("data name must be not empty string"))
 	}
-	err = util.ActionAdd(name, data, file)
+	if data == "" {
+		printError(errors.New("data must be not empty string"))
+	}
+
+	err := store.Add(name, []byte(data))
 
 	if err != nil {
-		printError(err.Error())
+		printError(err)
 	} else {
 		printSuccess()
 	}
 }
 
-func GetAction(name, workDir string, copyToClipboard bool) {
-	fileName := path.Join(workDir, helpers.GetMD5Hash(name+""))
-	info, err := os.Stat(fileName)
+func GetAction(store Store, key string, verbose bool) {
+	data, err := store.Get(key)
 
 	if err != nil {
-		printError("Not found")
+		printError(err)
 	}
 
-	file, err := os.OpenFile(path.Join(workDir, helpers.GetMD5Hash(name+"")), os.O_RDONLY, 0600)
-	if err != nil {
-		printError(err.Error())
-	}
-
-	r := bufio.NewReader(file)
-	data, err := r.Peek(int(info.Size()))
-
-	if err != nil {
-		printError(err.Error())
-	}
-
-	if copyToClipboard {
+	if !verbose {
 		err := clipboard.WriteAll(string(data))
 		if err != nil {
-			printError(err.Error())
+			printError(err)
 		}
 		fmt.Println("Copied to clipboard...")
 	} else {
@@ -136,8 +147,8 @@ func GetAction(name, workDir string, copyToClipboard bool) {
 	}
 }
 
-func printError(message string) {
-	fmt.Println(message)
+func printError(err error) {
+	fmt.Println(err.Error())
 	os.Exit(0)
 }
 
