@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"errors"
 	"io"
 )
 
@@ -12,6 +13,9 @@ type Aes struct {
 }
 
 func (a *Aes) Encrypt(data []byte) ([]byte, error) {
+	if len(a.key) == 0 {
+		return nil, errors.New("empty encoder key")
+	}
 	cphr, err := aes.NewCipher(a.key)
 	if err != nil {
 		return data, err
@@ -28,6 +32,9 @@ func (a *Aes) Encrypt(data []byte) ([]byte, error) {
 }
 
 func (a *Aes) Decrypt(data []byte) ([]byte, error) {
+	if len(a.key) == 0 {
+		return nil, errors.New("empty encoder key")
+	}
 	c, err := aes.NewCipher(a.key)
 	if err != nil {
 		return data, err

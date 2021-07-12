@@ -8,6 +8,6 @@ type Encoder interface {
 
 func NewEncoder() Encoder {
 	return &Aes{
-		key: []byte("asdasdfkfjfhgyth"),
+		key: []byte{},
 	}
 }

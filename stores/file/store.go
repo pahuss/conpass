@@ -4,8 +4,9 @@ import (
 	"bufio"
 	"conpass/encoder"
 	"conpass/helpers"
+	"crypto/sha1"
+	"encoding/hex"
 	"errors"
-	"fmt"
 	"os"
 	"path"
 )
@@ -23,7 +24,7 @@ func (s *Store) Get(key string) ([]byte, error) {
 		return nil, errors.New("not found")
 	}
 
-	file, err := os.OpenFile(path.Join(s.WorkDir, helpers.GetMD5Hash(key+"")), os.O_RDONLY, 0600)
+	file, err := os.OpenFile(path.Join(s.WorkDir, helpers.GetMD5Hash(key)), os.O_RDONLY, 0600)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +45,7 @@ func (s *Store) Get(key string) ([]byte, error) {
 }
 
 func (s *Store) Add(key string, data []byte) error {
-	openFile, err := os.OpenFile(path.Join(s.WorkDir, helpers.GetMD5Hash(key+"")), os.O_WRONLY|os.O_CREATE, 0600)
+	openFile, err := os.OpenFile(path.Join(s.WorkDir, helpers.GetMD5Hash(key)), os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		return err
 	}
@@ -53,14 +54,19 @@ func (s *Store) Add(key string, data []byte) error {
 	if err != nil {
 		return errors.New("encryption error")
 	}
-	n, err := openFile.Write(data)
-	fmt.Println(string(data), n)
+	_, err = openFile.Write(data)
 	return err
 }
 
 func (s *Store) Edit(key string, data []byte) error {
-	return nil
+	return s.Add(key, data)
 }
 func (s *Store) Delete(key string) error {
 	return nil
+}
+
+func (s *Store) SetEncodeKey(key, salt string) {
+	h := sha1.New()
+	h.Write([]byte((key + salt)))
+	s.Encoder.SetKey([]byte(helpers.GetMD5Hash(hex.EncodeToString(h.Sum(nil)))))
 }

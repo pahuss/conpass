@@ -4,6 +4,7 @@ import (
 	"conpass/encoder"
 	"conpass/helpers"
 	"conpass/stores/file"
+	"conpass/util"
 	"errors"
 	"fmt"
 	"github.com/atotto/clipboard"
@@ -24,6 +25,7 @@ type Store interface {
 	Add(key string, data []byte) error
 	Edit(key string, data []byte) error
 	Delete(key string) error
+	SetEncodeKey(key, salt string)
 }
 
 func newStore(args ...interface{}) Store {
@@ -61,7 +63,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	dataDirPath := path.Join(workDir, helpers.GetMD5Hash(current.Username))
+	salt := helpers.GetMD5Hash(current.Username)
+	dataDirPath := path.Join(workDir, salt)
 
 	dataDirInfo, err := os.Stat(dataDirPath)
 
@@ -72,8 +75,39 @@ func main() {
 			os.Exit(1)
 		}
 	} else if !dataDirInfo.IsDir() {
-		fmt.Printf("%s data dir is file", dataDirInfo)
+		fmt.Printf("%s data dir is file\n", dataDirInfo)
 		os.Exit(1)
+	}
+
+	if !util.CheckIsPasswordWasSet(dataDirPath) {
+		fmt.Println("You need to set a password to encrypt your data. If you forget it or lose\n" +
+			"your data will be lost.")
+		fmt.Print("Set your password: ")
+		bytePassword, _ := term.ReadPassword(syscall.Stdin)
+		err := util.SetPassword(dataDirPath, string(bytePassword), salt)
+		fmt.Println()
+
+		if err != nil {
+			fmt.Println("error setting password")
+			os.Exit(1)
+		}
+
+		fmt.Print("Confirm password: ")
+		confirmBytePassword, _ := term.ReadPassword(syscall.Stdin)
+		fmt.Println()
+
+		if string(confirmBytePassword) != string(bytePassword) {
+			fmt.Println("error setting password")
+			os.Exit(1)
+		}
+
+		err = util.SetPassword(dataDirPath, string(bytePassword), salt)
+		if err != nil {
+			fmt.Println("error setting password")
+			os.Exit(1)
+		}
+
+		fmt.Println("Success")
 	}
 
 	store := newStore(dataDirPath, encoder.NewEncoder())
@@ -91,8 +125,12 @@ func main() {
 		AddFlag("verbose,V", "Out data to screen", commando.Bool, false).
 		SetAction(func(args map[string]commando.ArgValue, flags map[string]commando.FlagValue) {
 			fmt.Print("Password: ")
-			bytePassword, _ := term.ReadPassword(int(syscall.Stdin))
-			fmt.Println(string(bytePassword))
+			bytePassword, _ := term.ReadPassword(syscall.Stdin)
+			fmt.Println()
+			if !util.CheckPassword(dataDirPath, string(bytePassword), salt) {
+				printError(errors.New("wrong password\n"))
+			}
+			store.SetEncodeKey(string(bytePassword), salt)
 			GetAction(store, flags["name"].Value.(string), flags["verbose"].Value.(bool))
 		})
 
@@ -104,6 +142,13 @@ func main() {
 		AddFlag("name,n", "Data name", commando.String, "").
 		AddFlag("data,d", "Data body", commando.String, "").
 		SetAction(func(args map[string]commando.ArgValue, flags map[string]commando.FlagValue) {
+			fmt.Print("Password: ")
+			bytePassword, _ := term.ReadPassword(syscall.Stdin)
+			fmt.Println()
+			if !util.CheckPassword(dataDirPath, string(bytePassword), salt) {
+				printError(errors.New("wrong password\n"))
+			}
+			store.SetEncodeKey(string(bytePassword), salt)
 			name, data := getFlags(flags)
 			AddAction(store, name, data)
 		})
