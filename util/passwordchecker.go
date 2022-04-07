@@ -1,7 +1,7 @@
 package util
 
 import (
-	"conpass/helpers"
+	"github.com/pahuss/conpass/helpers"
 	"io/ioutil"
 	"os"
 	"path"

@@ -2,11 +2,11 @@ package file
 
 import (
 	"bufio"
-	"conpass/encoder"
-	"conpass/helpers"
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
+	"github.com/pahuss/conpass/encoder"
+	"github.com/pahuss/conpass/helpers"
 	"os"
 	"path"
 )

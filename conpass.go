@@ -1,14 +1,14 @@
 package main
 
 import (
-	"conpass/encoder"
-	"conpass/helpers"
-	"conpass/stores/file"
-	"conpass/util"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/atotto/clipboard"
+	"github.com/pahuss/conpass/encoder"
+	"github.com/pahuss/conpass/helpers"
+	"github.com/pahuss/conpass/stores/file"
+	"github.com/pahuss/conpass/util"
 	"github.com/thatisuday/commando"
 	"golang.org/x/term"
 	"os"

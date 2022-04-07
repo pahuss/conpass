@@ -1,4 +1,4 @@
-module conpass
+module github.com/pahuss/conpass
 
 go 1.16
 
